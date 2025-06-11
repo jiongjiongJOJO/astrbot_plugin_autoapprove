@@ -1,0 +1,13 @@
+name: 群聊自动审批插件
+desc: 支持通过超级管理员指令设置群聊白名单，自动审批指定QQ的加群申请
+help: |
+  群聊自动审批插件支持通过超级管理员指令设置群聊白名单，自动审批指定QQ的加群申请。
+
+  使用方法：
+  - 设置白名单：`/add <群号> <QQ号>, <QQ号>, ...`
+  - 移除白名单：`/remove <群号> <QQ号>, <QQ号>, ...`
+
+  注意：只有超级管理员可以使用这些指令。
+version: 1.0.0
+author: 囧囧JOJO
+repo: https://github.com/jiongjiongJOJO/astrbot_plugin_autoapprove
