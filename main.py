@@ -29,7 +29,7 @@ class GroupAutoApprovePlugin(Star):
             for key, value in config.items():
                 if key in self.config:
                     self.config[key] = value
-            logger.info(f"群聊自动审批插件插件配置加载成功: {self.config}")
+            logger.info(f"群聊自动审批插件插件配置加载成功")
         else:
             # 否则从context加载配置
             self._load_config()
@@ -62,7 +62,7 @@ class GroupAutoApprovePlugin(Star):
                     if isinstance(v, list):
                         data[k] = set(v)
                 self.config.update(data)
-            logger.info(f"群聊自动审批插件配置已加载: {self.config}")
+            logger.info(f"群聊自动审批插件配置已加载")
         except Exception as e:
             logger.error(f"加载群聊自动审批插件配置失败: {e}")
 
@@ -139,7 +139,7 @@ class GroupAutoApprovePlugin(Star):
             if not group_whitelist:
                 yield event.plain_result(f"群{group_id}当前无白名单成员")
             else:
-                yield event.plain_result(f"群{group_id}当前白名单：{', '.join(group_whitelist)}")
+                yield event.plain_result(f"群{group_id}当前白名单数量：{len(group_whitelist)}")
             return
 
         # 解析QQ号列表（去空、去重）
@@ -163,9 +163,9 @@ class GroupAutoApprovePlugin(Star):
         # 保存配置
         self._save_config()  # 保存数据
         current_qqs = self.config.get(group_id, [])
-        logger.info(f"群 {group_id} 当前白名单：{current_qqs, type(current_qqs)}, configs: {self.config}")
+        logger.info(f"群 {group_id} 当前白名单数量：{len(current_qqs)}, configs: {self.config}")
         yield event.plain_result(
-            f"操作成功！群{group_id}当前白名单：{', '.join(current_qqs) or '无'}"
+            f"操作成功！群{group_id}当前白名单数量：{len(current_qqs)}"
         )
 
     async def process_group_join_request(self, event: AstrMessageEvent, request_data):
@@ -176,7 +176,6 @@ class GroupAutoApprovePlugin(Star):
         group_id = request_data.get("group_id", "")
 
         logger.info(f"收到加群请求: 用户ID={user_id}, 群ID={group_id}, 验证信息={comment}")
-        logger.info('当前白名单配置为: {}'.format(self.config))
 
         # 检查是否在白名单中
         if str(group_id) not in self.config.keys():
