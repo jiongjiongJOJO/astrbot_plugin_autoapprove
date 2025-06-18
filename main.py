@@ -120,27 +120,20 @@ class GroupAutoApprovePlugin(Star):
         if raw_message.get("request_type") == "group" and raw_message.get("sub_type") == "add":
             await self.process_group_join_request(event, raw_message)
 
-    @filter.command("加群自动审批")
-    @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
-    async def handle_admin_command(self, event: AstrMessageEvent, action: str, group_id: str, qq_list: str = ""):
-        """
-        指令处理：/加群自动审批 add|remove 群号 QQ号1,QQ号2,...
-        - action: add（添加）或 remove（删除）
-        - group_id: 目标群号（字符串类型）
-        - qq_list: 逗号分隔的QQ号字符串
-        """
-        if action not in ["add", "remove", "list"]:
-            yield event.plain_result("操作类型错误！请使用 add 或 remove 或 list")
-            return
+    @filter.command_group("加群自动审批")
+    def plugin_group_command(self):
+        pass
 
-        if action == "list":
-            # 列出当前群的白名单
-            group_whitelist = self.config.get(group_id, set())
-            if not group_whitelist:
-                yield event.plain_result(f"群{group_id}当前无白名单成员")
-            else:
-                yield event.plain_result(f"群{group_id}当前白名单数量：{len(group_whitelist)}")
-            return
+    @plugin_group_command.command("add")
+    @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
+    async def add_white_list(self, event: AstrMessageEvent, group_id: str, qq_list: str):
+        """
+        指令处理：添加群聊自动审批白名单
+        """
+        """
+        :param: group_id: 目标群号（字符串类型）
+        :param: qq_list: 逗号分隔的QQ号字符串
+        """
 
         # 解析QQ号列表（去空、去重）
         qq_list = {qq.strip() for qq in qq_list.split(",") if qq.strip()}
@@ -150,23 +143,107 @@ class GroupAutoApprovePlugin(Star):
 
         # 操作白名单
         group_whitelist = self.config.setdefault(group_id, set())
-        if action == "add":
-            group_whitelist.update(qq_list)
-            self.config[group_id] = group_whitelist  # 确保更新后的白名单被保存
-        else:
-            group_whitelist.difference_update(qq_list)
+        group_whitelist.update(qq_list)
+        self.config[group_id] = group_whitelist  # 确保更新后的白名单被保存
+        # 保存配置
+        self._save_config()  # 保存数据
+        current_qqs = self.config.get(group_id, [])
+        logger.info(f"群 {group_id} 添加白名单成功，当前白名单数量：{len(current_qqs)}")
+        yield event.plain_result(
+            f"白名单添加成功！群{group_id}当前白名单数量：{len(current_qqs)}"
+        )
+
+    @plugin_group_command.command("remove")
+    @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
+    async def remove_white_list(self, event: AstrMessageEvent, group_id: str, qq_list: str = ""):
+        """
+        指令处理：删除群聊自动审批白名单（参数为空则删除目标群聊全部白名单）
+        """
+        """
+        :param: group_id: 目标群号（字符串类型）
+        :param: qq_list: 逗号分隔的QQ号字符串(可为空)
+        """
+        group_id = str(group_id).strip()
+        qq_list = str(qq_list).strip()
+        if qq_list:
+            # 解析QQ号列表（去空、去重）
+            # 解析
+            qq_list_parms = {qq.strip() for qq in qq_list.split(",") if qq.strip()}
+            # 操作白名单
+            group_whitelist = self.config.setdefault(group_id, set())
+            group_whitelist.difference_update(qq_list_parms)
             self.config[group_id] = group_whitelist
             # 若群白名单为空，删除该群记录
             if not group_whitelist:
                 del self.config[group_id]
+        else:
+            del self.config[group_id]  # 删除该群的白名单配置
 
         # 保存配置
         self._save_config()  # 保存数据
         current_qqs = self.config.get(group_id, [])
-        logger.info(f"群 {group_id} 当前白名单数量：{len(current_qqs)}, configs: {self.config}")
-        yield event.plain_result(
-            f"操作成功！群{group_id}当前白名单数量：{len(current_qqs)}"
-        )
+        if qq_list == "":
+            logger.info(f"群 {group_id} 白名单清空")
+            yield event.plain_result(f"群{group_id}白名单已清空！")
+        else:
+            logger.info(f"群 {group_id} 当前白名单数量：{len(current_qqs)}")
+            yield event.plain_result(
+                f"白名单清除操作成功！群{group_id}当前白名单数量：{len(current_qqs)}"
+            )
+
+    @plugin_group_command.command("list")
+    @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
+    async def get_white_list(self, event: AstrMessageEvent, group_id: str):
+        """
+        指令处理：列出群聊自动审批白名单数量
+        """
+        """
+        :param: group_id: 目标群号（字符串类型）
+        """
+        # 列出当前群的白名单
+        group_whitelist = self.config.get(group_id, set())
+        if not group_whitelist:
+            yield event.plain_result(f"群{group_id}当前无白名单成员")
+        else:
+            yield event.plain_result(f"群{group_id}当前白名单数量：{len(group_whitelist)}")
+        return
+
+    # todo: 暂时未开发完成
+    # @plugin_group_command.command("schedule")
+    # @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
+    async def schedule_process_requests(self, event: AstrMessageEvent, interval: int = 60):
+        """
+        定时处理未响应的加群请求
+        - interval: 定时处理的间隔时间，单位为秒，默认为60秒，小于等于0则不启用定时处理
+        """
+        if interval <= 0:
+            pass
+
+    def schedule_process_requests(self, event: AstrMessageEvent, interval: int = 60):
+        """定时处理未响应的加群请求"""
+        async def process_requests():
+            while True:
+                try:
+                    # 获取当前时间戳
+                    current_time = asyncio.get_event_loop().time()
+                    # 遍历所有群组
+                    for group_id, whitelist in self.config.items():
+                        # 检查是否有未处理的加群请求
+                        # 这里需要实现获取未处理请求的逻辑
+                        # 假设有一个函数 get_pending_requests(group_id) 返回未处理的请求列表
+                        pending_requests = await self.get_pending_requests(group_id)
+                        for request in pending_requests:
+                            user_id = request.get("user_id", "")
+                            if str(user_id) in whitelist:
+                                logger.info(f"自动同意用户 {user_id} 的加群请求")
+                                await self.approve_request(event, request.get("flag", ""), True)
+                            else:
+                                logger.info(f"用户 {user_id} 不在白名单中，跳过")
+                except Exception as e:
+                    logger.error(f"定时处理加群请求失败: {e}")
+                await asyncio.sleep(interval)
+
+        asyncio.create_task(process_requests())
 
     async def process_group_join_request(self, event: AstrMessageEvent, request_data):
         """处理加群请求"""
