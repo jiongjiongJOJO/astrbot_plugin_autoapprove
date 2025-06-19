@@ -5,6 +5,7 @@ from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
 from astrbot.core.platform.astrbot_message import AstrBotMessage
+import astrbot.api.message_components as Comp
 from typing import Optional
 import asyncio
 
@@ -201,12 +202,23 @@ class GroupAutoApprovePlugin(Star):
         :param: group_id: 目标群号（字符串类型）
         """
         # 列出当前群的白名单
-        group_whitelist = self.config.get(group_id, set())
+        group_whitelist = list(self.config.get(group_id, set()))
+        group_whitelist.sort()
         if not group_whitelist:
             yield event.plain_result(f"群{group_id}当前无白名单成员")
         else:
+            # 将group_whitelist按照300个元素一份，拆分成多份
+            plains = []
+            for i in range(0, len(group_whitelist), 180):
+                plains.append(
+                    ','.join(group_whitelist[i:i + 180])
+                )
             yield event.plain_result(f"群{group_id}当前白名单数量：{len(group_whitelist)}")
+            for plain in plains:
+                yield event.plain_result(plain)
+            logger.info('[debug]: 群{}当前白名单数量：{}，已生成HTML预览'.format(group_id, len(group_whitelist)))
         return
+
 
     @plugin_group_command.command("manual")
     @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
