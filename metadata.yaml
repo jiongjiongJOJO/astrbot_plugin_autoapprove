@@ -8,6 +8,6 @@ help: |
   - 移除白名单：`/remove <群号> <QQ号>, <QQ号>, ...`
 
   注意：只有超级管理员可以使用这些指令。
-version: 1.0.0
+version: 1.0.1
 author: 囧囧JOJO
 repo: https://github.com/jiongjiongJOJO/astrbot_plugin_autoapprove

@@ -208,42 +208,34 @@ class GroupAutoApprovePlugin(Star):
             yield event.plain_result(f"群{group_id}当前白名单数量：{len(group_whitelist)}")
         return
 
-    # todo: 暂时未开发完成
-    # @plugin_group_command.command("schedule")
-    # @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
-    async def schedule_process_requests(self, event: AstrMessageEvent, interval: int = 60):
+    @plugin_group_command.command("manual")
+    @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
+    async def manual_process_requests(self, event: AstrMessageEvent):
         """
-        定时处理未响应的加群请求
-        - interval: 定时处理的间隔时间，单位为秒，默认为60秒，小于等于0则不启用定时处理
+        手动处理未响应的加群请求
         """
-        if interval <= 0:
-            pass
-
-    def schedule_process_requests(self, event: AstrMessageEvent, interval: int = 60):
-        """定时处理未响应的加群请求"""
-        async def process_requests():
-            while True:
-                try:
-                    # 获取当前时间戳
-                    current_time = asyncio.get_event_loop().time()
-                    # 遍历所有群组
-                    for group_id, whitelist in self.config.items():
-                        # 检查是否有未处理的加群请求
-                        # 这里需要实现获取未处理请求的逻辑
-                        # 假设有一个函数 get_pending_requests(group_id) 返回未处理的请求列表
-                        pending_requests = await self.get_pending_requests(group_id)
-                        for request in pending_requests:
-                            user_id = request.get("user_id", "")
-                            if str(user_id) in whitelist:
-                                logger.info(f"自动同意用户 {user_id} 的加群请求")
-                                await self.approve_request(event, request.get("flag", ""), True)
-                            else:
-                                logger.info(f"用户 {user_id} 不在白名单中，跳过")
-                except Exception as e:
-                    logger.error(f"定时处理加群请求失败: {e}")
-                await asyncio.sleep(interval)
-
-        asyncio.create_task(process_requests())
+        client = event.bot  # 得到 client
+        ret = await client.api.call_action('get_group_system_msg')  # 调用 协议端  API
+        yield event.plain_result(
+            '待处理加群请求数: {}'.format(
+                len(ret.get('join_requests', [])),
+            )
+        )
+        # 统计
+        processed_count = 0
+        for request in ret.get('join_requests', []):
+            if request.get('checked', True):
+                continue
+            request_data = {
+                "flag": request.get("request_id", ""),
+                "user_id": request.get("invitor_uin", ""),
+                "comment": request.get("message", ""),
+                "group_id": request.get("group_id", "")
+            }
+            # 处理加群请求
+            await self.process_group_join_request(event, request_data)
+            processed_count += 1
+        yield event.plain_result("手动处理加群请求完成, 共处理请求数: " + str(processed_count))
 
     async def process_group_join_request(self, event: AstrMessageEvent, request_data):
         """处理加群请求"""
@@ -252,7 +244,13 @@ class GroupAutoApprovePlugin(Star):
         comment = request_data.get("comment", "")
         group_id = request_data.get("group_id", "")
 
-        logger.info(f"收到加群请求: 用户ID={user_id}, 群ID={group_id}, 验证信息={comment}")
+        logger.info(
+            f"收到加群请求: "
+            f"请求标识={flag}, "
+            f"用户ID={user_id}, "
+            f"群ID={group_id}, "
+            f"验证信息={comment}".replace('\r', '').replace('\n', '')
+        )
 
         # 检查是否在白名单中
         if str(group_id) not in self.config.keys():
