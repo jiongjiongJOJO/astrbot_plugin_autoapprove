@@ -19,18 +19,13 @@ class GroupAutoApprovePlugin(Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
         # 默认配置
-        self.config = {
-        }
+        self.config = config
 
-        # 如果传入了配置，则使用传入的配置
-        if config:
-            for key, value in config.items():
-                if key in self.config:
-                    self.config[key] = value
-            logger.info(f"群聊自动审批插件插件配置加载成功")
-        else:
-            # 否则从context加载配置
-            self._load_config()
+        if isinstance(self.config.get("whitelist"), str):
+            self.config["whitelist"] = json.loads(
+                self.config.get("whitelist", "[]"), strict=False
+            )
+        logger.info('[加群自动审批插件] 成功加载配置: {}'.format(self.config))
 
         # Monkey patch AstrBotMessage类，确保所有实例都有session_id属性
         original_init = AstrBotMessage.__init__
@@ -43,39 +38,6 @@ class GroupAutoApprovePlugin(Star):
         # 应用monkey patch
         AstrBotMessage.__init__ = patched_init
         logger.info("已应用AstrBotMessage的monkey patch，确保session_id属性存在")
-
-    def _load_config(self):
-        """加载配置"""
-        base_path = os.path.abspath(os.path.dirname(__file__))
-        config_path = os.path.join(base_path, "config.json")
-        if not os.path.exists(config_path):
-            logger.warning(f"配置文件 {config_path} 不存在，使用默认配置")
-            return
-
-        try:
-            with open(config_path, "r", encoding="utf-8") as f:
-                data = json.load(f)
-                # 确保所有值都是 set 类型
-                for k, v in data.items():
-                    if isinstance(v, list):
-                        data[k] = set(v)
-                self.config.update(data)
-            logger.info(f"群聊自动审批插件配置已加载")
-        except Exception as e:
-            logger.error(f"加载群聊自动审批插件配置失败: {e}")
-
-    def _save_config(self):
-        """保存配置到上下文"""
-        base_path = os.path.abspath(os.path.dirname(__file__))
-        config_path = os.path.join(base_path, "config.json")
-        try:
-            # 将 set 转为 list 以兼容 JSON
-            data = {k: list(v) for k, v in self.config.items()}
-            with open(config_path, "w", encoding="utf-8") as f:
-                json.dump(data, f, ensure_ascii=False, indent=2)
-            logger.info(f"群聊自动审批插件配置已保存到 {config_path}")
-        except Exception as e:
-            logger.error(f"保存群聊自动审批插件配置失败: {e}")
 
     def set_session_id(self, event):
         """设置session_id属性"""
@@ -140,12 +102,13 @@ class GroupAutoApprovePlugin(Star):
             return
 
         # 操作白名单
-        group_whitelist = self.config.setdefault(group_id, set())
-        group_whitelist.update(qq_list)
-        self.config[group_id] = group_whitelist  # 确保更新后的白名单被保存
-        # 保存配置
-        self._save_config()  # 保存数据
-        current_qqs = self.config.get(group_id, [])
+        group_whitelist = self.get_group_whitelist(group_id)
+        group_whitelist.extend(qq_list)
+        group_whitelist = list(set(group_whitelist))
+        self.update_group_whitelist(group_id, group_whitelist)
+        logger.info(f"配置即将保存，self.config: {self.config}")
+        self.config.save_config()  # 保存数据
+        current_qqs = self.get_group_whitelist(group_id)
         logger.info(f"群 {group_id} 添加白名单成功，当前白名单数量：{len(current_qqs)}")
         yield event.plain_result(
             f"白名单添加成功！群{group_id}当前白名单数量：{len(current_qqs)}"
@@ -168,19 +131,20 @@ class GroupAutoApprovePlugin(Star):
             # 解析
             qq_list_parms = {qq.strip() for qq in qq_list.split(",") if qq.strip()}
             # 操作白名单
-            group_whitelist = self.config.setdefault(group_id, set())
-            group_whitelist.difference_update(qq_list_parms)
-            self.config[group_id] = group_whitelist
+            group_whitelist = self.get_group_whitelist(group_id)
+            # 将qq_list_parms中的QQ号从群白名单中删除, 如果不存在则忽略
+            group_whitelist = [qq for qq in group_whitelist if qq not in qq_list_parms]
+            self.update_group_whitelist(group_id, group_whitelist)
             # 若群白名单为空，删除该群记录
             if not group_whitelist:
-                del self.config[group_id]
+                self.del_group_whitelist(group_id)
         else:
-            del self.config[group_id]  # 删除该群的白名单配置
+            self.del_group_whitelist(group_id)  # 删除群白名单记录
 
         # 保存配置
-        self._save_config()  # 保存数据
-        current_qqs = self.config.get(group_id, [])
-        if qq_list == "":
+        self.config.save_config()  # 保存数据
+        current_qqs = self.get_group_whitelist(group_id)
+        if not qq_list:
             logger.info(f"群 {group_id} 白名单清空")
             yield event.plain_result(f"群{group_id}白名单已清空！")
         else:
@@ -199,12 +163,12 @@ class GroupAutoApprovePlugin(Star):
         :param: group_id: 目标群号（字符串类型）
         """
         # 列出当前群的白名单
-        group_whitelist = list(self.config.get(group_id, set()))
+        group_whitelist = self.get_group_whitelist(group_id)
         group_whitelist.sort()
         if not group_whitelist:
             yield event.plain_result(f"群{group_id}当前无白名单成员")
         else:
-            # 将group_whitelist按照300个元素一份，拆分成多份
+            # 将group_whitelist按照180个元素一份，拆分成多份
             plains = []
             for i in range(0, len(group_whitelist), 180):
                 plains.append(
@@ -213,7 +177,7 @@ class GroupAutoApprovePlugin(Star):
             yield event.plain_result(f"群{group_id}当前白名单数量：{len(group_whitelist)}")
             for plain in plains:
                 yield event.plain_result(plain)
-            logger.info('[debug]: 群{}当前白名单数量：{}，已生成HTML预览'.format(group_id, len(group_whitelist)))
+            logger.info('[debug]: 群{}当前白名单数量：{}'.format(group_id, len(group_whitelist)))
         return
 
     @plugin_group_command.command("manual", alias={'手动处理', '手动'})
@@ -264,10 +228,10 @@ class GroupAutoApprovePlugin(Star):
         )
 
         # 检查是否在白名单中
-        if str(group_id) not in self.config.keys():
+        if str(group_id) not in self.get_group_list():
             logger.info(f"群 {group_id} 不在自动审批配置中，跳过自动审批")
             return
-        group_whitelist = self.config[str(group_id)]
+        group_whitelist = self.get_group_whitelist(str(group_id))
         if str(user_id) in group_whitelist:
             logger.info(f"用户 {user_id} 在群 {group_id} 的白名单中，自动同意加群请求")
             await self.approve_request(event, flag, True)
@@ -321,3 +285,39 @@ class GroupAutoApprovePlugin(Star):
     async def terminate(self):
         """插件被卸载/停用时调用"""
         logger.info("群聊自动审批插件插件已停用")
+
+    def get_group_list(self):
+        """获取当前配置中的群聊白名单"""
+        whitelists = self.config.get("whitelist", {})
+        group_list = []
+        for group in whitelists:
+            group_id = group.get("group_id")
+            if group_id:
+                group_list.append(group_id)
+        return group_list
+
+    def get_group_whitelist(self, group_id: str):
+        """获取指定群聊的白名单"""
+        for group in self.config.get("whitelist", []):
+            if group.get("group_id") == group_id:
+                return group.get("whitelist", [])
+        return []
+
+    def update_group_whitelist(self, group_id: str, whitelist: list):
+        """更新指定群聊的白名单"""
+        for group in self.config.get("whitelist", []):
+            if group.get("group_id") == group_id:
+                group["whitelist"] = whitelist
+                return
+        # 如果群聊不存在，则添加新的群聊记录
+        self.config["whitelist"].append({
+            "group_id": group_id,
+            "whitelist": whitelist
+        })
+
+    def del_group_whitelist(self, group_id: str):
+        """删除指定群聊的白名单"""
+        for group in self.config.get("whitelist", []):
+            if group.get("group_id") == group_id:
+                self.config["whitelist"].remove(group)
+                return

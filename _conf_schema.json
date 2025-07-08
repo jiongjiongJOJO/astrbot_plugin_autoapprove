@@ -1,0 +1,11 @@
+{
+  "whitelist": {
+    "type": "string",
+    "description": "白名单列表",
+    "hint": "格式为 JSON 数组，group_id为字符串，whitelist为字符串数组",
+    "example": "[{\"group_id\": \"123456789\", \"whitelist\": [\"987654321\", \"112233445\"]}]",
+    "editor_mode": true,
+    "editor_language": "json",
+    "default": "[{\"group_id\": \"123456789\", \"whitelist\": [\"987654321\", \"112233445\"]}]"
+  }
+}
