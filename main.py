@@ -221,12 +221,15 @@ class GroupAutoApprovePlugin(Star):
 
     @plugin_group_command.command("manual")
     @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
-    async def manual_process_requests(self, event: AstrMessageEvent):
+    async def manual_process_requests(self, event: AstrMessageEvent, list_count: int = 50):
         """
         手动处理未响应的加群请求
         """
         client = event.bot  # 得到 client
-        ret = await client.api.call_action('get_group_system_msg')  # 调用 协议端  API
+        payloads = {
+            "count": list_count
+        }
+        ret = await client.api.call_action('get_group_system_msg', **payloads)  # 调用 协议端  API
         yield event.plain_result(
             '待处理加群请求数: {}'.format(
                 len(ret.get('join_requests', [])),
