@@ -122,7 +122,7 @@ class GroupAutoApprovePlugin(Star):
     def plugin_group_command(self):
         pass
 
-    @plugin_group_command.command("add")
+    @plugin_group_command.command("add", alias={'添加', '新增', '增加'})
     @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
     async def add_white_list(self, event: AstrMessageEvent, group_id: str, qq_list: str):
         """
@@ -151,7 +151,7 @@ class GroupAutoApprovePlugin(Star):
             f"白名单添加成功！群{group_id}当前白名单数量：{len(current_qqs)}"
         )
 
-    @plugin_group_command.command("remove")
+    @plugin_group_command.command("remove", alias={'删除', '移除', 'rm', 'del', 'clear'})
     @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
     async def remove_white_list(self, event: AstrMessageEvent, group_id: str, qq_list: str = ""):
         """
@@ -189,7 +189,7 @@ class GroupAutoApprovePlugin(Star):
                 f"白名单清除操作成功！群{group_id}当前白名单数量：{len(current_qqs)}"
             )
 
-    @plugin_group_command.command("list")
+    @plugin_group_command.command("list", alias={'列出', '查看', 'show', 'ls'})
     @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
     async def get_white_list(self, event: AstrMessageEvent, group_id: str):
         """
@@ -216,8 +216,7 @@ class GroupAutoApprovePlugin(Star):
             logger.info('[debug]: 群{}当前白名单数量：{}，已生成HTML预览'.format(group_id, len(group_whitelist)))
         return
 
-
-    @plugin_group_command.command("manual")
+    @plugin_group_command.command("manual", alias={'手动处理', '手动'})
     @filter.permission_type(filter.PermissionType.ADMIN)  # AstrBot 管理员权限标识
     async def manual_process_requests(self, event: AstrMessageEvent, list_count: int = 50):
         """
