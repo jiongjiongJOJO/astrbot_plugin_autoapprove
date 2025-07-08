@@ -1,12 +1,10 @@
 import json
-import os
-
-from astrbot.api.event import filter, AstrMessageEvent
-from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
-from astrbot.core.platform.astrbot_message import AstrBotMessage
 from typing import Optional
-import asyncio
+from astrbot.api import logger
+from astrbot.api.star import Context, Star, register
+from astrbot.api.event import filter, AstrMessageEvent
+from astrbot.core.platform.astrbot_message import AstrBotMessage
+from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
 
 
 class ApifoxModel:
@@ -286,8 +284,6 @@ class GroupAutoApprovePlugin(Star):
 
             # 检查是否为aiocqhttp平台
             if event.get_platform_name() == "aiocqhttp":
-                # 使用NapCat API格式
-                from astrbot.core.platform.sources.aiocqhttp.aiocqhttp_message_event import AiocqhttpMessageEvent
                 assert isinstance(event, AiocqhttpMessageEvent)
                 client = event.bot
 
