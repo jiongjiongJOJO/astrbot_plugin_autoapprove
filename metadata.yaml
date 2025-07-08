@@ -10,6 +10,6 @@ help: |
   - 手动处理加群申请：`/加群自动审批 manual`(会处理所有未处理的加群申请，但由于napcat的限制，目前只能处理最新的50条（且包含已处理的）)
 
   注意：只有超级管理员可以使用这些指令。
-version: 1.0.2
+version: 1.1.0
 author: 囧囧JOJO
 repo: https://github.com/jiongjiongJOJO/astrbot_plugin_autoapprove

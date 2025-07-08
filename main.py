@@ -14,7 +14,7 @@ class ApifoxModel:
         self.reason = reason
 
 
-@register("astrbot_plugin_autoapprove", "囧囧JOJO", "群聊自动审批插件", "1.0.0")
+@register("astrbot_plugin_autoapprove", "囧囧JOJO", "群聊自动审批插件", "1.1.0")
 class GroupAutoApprovePlugin(Star):
     def __init__(self, context: Context, config=None):
         super().__init__(context)
